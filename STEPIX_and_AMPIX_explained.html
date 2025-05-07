@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>STEPIX 与 AMPIX 方法说明</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <h2>STEPIX 与 AMPIX 计算方法说明</h2>
+
+    <p><strong>步骤 1：CMAP 阶跃计算</strong></p>
+    <p>从 CMAP 扫描数据中，先降序排列，再提取所有相邻刺激强度对应的 CMAP 振幅值之差，定义为阶跃（step）：</p>
+    <p>\[ \Delta A_n = |A_{n+1} - A_n| \]</p>
+    <p>其中，\( A_n \) 表示第 \( n \) 个刺激对应的 CMAP 振幅。</p>
+
+    <p><strong>步骤 2：step 排序</strong></p>
+    <p>将所有 step 从大到小排序，记为：</p>
+    <p>\[ \Delta A_{(1)} \geq \Delta A_{(2)} \geq \cdots \geq \Delta A_{(N-1)} \]</p>
+    <p>排序后的索引记为 \( x = 1, 2, ..., N-1 \)。</p>
+
+    <p><strong>步骤 3：确定 R 点</strong></p>
+    <p>设定噪声门槛为 20 μV，找到最后一个满足：</p>
+    <p>\[ \Delta A_{(x)} > 20\,\mu V \]</p>
+    <p>的位置，记为 R 点。它标志着从物理上仍可信的最后一个放电 step。</p>
+
+    <p><strong>步骤 4：log 拟合并确定 P 点</strong></p>
+    <p>对满足 \( \Delta A_{(x)} > 50\,\mu V \) 的 step 子集进行对数拟合，模型形式为：</p>
+    <p>\[ \Delta A(x) = a \cdot \log(x) + b \]</p>
+    <p>其中，\( a \) 与 \( b \) 为回归系数。令拟合函数为零，得到与横轴交点 \( P_x \)：</p>
+    <p>\[ P_x = \exp\left(-\frac{b}{a}\right) \]</p>
+
+    <p><strong>步骤 5：计算 P 点左侧的平均单位 step slope</strong></p>
+    <p>在 \( x &lt; P_x \) 范围内，step 的平均贡献定义为：</p>
+    <p>\[ \text{mean_step} = \frac{1}{\lfloor P_x \rfloor} \cdot \left( \frac{\sum_{i=1}^{\lfloor P_x \rfloor} \Delta A_{(i)}}{\max A} \right) \]</p>
+
+    <p><strong>步骤 6：计算 Q 点位置</strong></p>
+    <p>为了达到 80% 最大 CMAP 振幅，理论上所需的 MU 数为：</p>
+    <p>\[ Q_x = \left\lfloor \frac{0.8}{\text{mean_step}} \right\rfloor \]</p>
+
+    <p><strong>步骤 7：确定 STEPIX</strong></p>
+    <p>最终选取的代表性 step 序号为：</p>
+    <p>\[ \text{STEPIX} = \min(Q_x, R) \]</p>
+
+    <p><strong>步骤 8：计算 AMPIX</strong></p>
+    <p>定义最大 CMAP 振幅与 STEPIX 的比值为 AMPIX：</p>
+    <p>\[ \text{AMPIX} = \frac{\max A}{\text{STEPIX}} \]</p>
+
+    <h3>算法设计背景与意义</h3>
+    <p>本方法旨在估计到底有多少个 motor units（MUs）被激活了，而且是有效的、可靠的、不被噪声影响的。如果我们只要求达到 80% 的最终 CMAP 响应，理论上要招募多少个 MU？</p>
+
+    <p>这个角度更符合生理意义：</p>
+    <p>人在正常或病理状态下，很可能没有招募到全部 MU，但已经产生了大部分 CMAP 响应。</p>
+
+    <table border="1" cellpadding="6">
+      <thead>
+        <tr><th>原因</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>💡 生理上常见阈值</td><td>在 MUNE 和 CMAP 建模中，“80% 最大反应”常被用作临床可靠响应指标（非饱和区）</td></tr>
+        <tr><td>✅ 避免饱和</td><td>后 10–20% 的 CMAP 增量常常是高强度刺激导致的电流扩散、非 MU 放电引起的伪增益</td></tr>
+        <tr><td>✅ 稳定性好</td><td>低于 80% 易被 early noise 干扰，高于 80% 又会被刺激伪影干扰，80% 是折中点</td></tr>
+      </tbody>
+    </table>
+
+    <p>step_amp 实际上就是 CMAP 的两两差值降序，我们可以把多个 MU 但包含在同一次差值里激活的看成一个 MU。</p>
+    <p>差值越大说明是不同 MU 的放电；差值很小说明可能是噪声。</p>
+    <p>差值小于 20μV 被视为噪声，因此 R_x 是可信放电的边界（最多招募 MU 个数）。</p>
+    <p>P_x 是理论最大放电 MU 个数，通过对数拟合估计。比如刺激500次，又不可能一直有500个MU被激活，所以通过拟合的方法大致知道差不多有多少个MU可以放电，差值为0就说明没有MU了，这时候就是P_x</p>
+    <p>将前 P_x 个 MU 累加 CMAP 后求均值，得出 SMUP 值。</p>
+    <p>如果要得到80%maxcmap下要多少个MU，那直接去找就好了，而且一开始的差值都很大，说明少量MU就能得到80%cmap了。</p>
+    <p>现在这个 Q_x 用 SMUP 值反推出达到 80% CMAP 所需 MU 个数，是一个假设值。</p>
+
+    <p><strong>当 \( Q_x &gt; R_x \)：</strong></p>
+    <ul>
+      <li>说明平均 MU 输出太弱，或 R 点太保守；</li>
+      <li>更可能两者兼有，肌肉状态差 + 信噪比低；</li>
+      <li>因此不能继续使用 Q 点，以免进入噪声区域，必须保守选 R。</li>
+    </ul>
+
+    <p><strong>当 \( Q_x &lt; R_x \)：</strong></p>
+    <p>说明 80% CMAP 输出在可信放电区间内，Q 点估计有效，可作为 STEPIX。</p>
+</body>
+</html>

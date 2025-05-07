@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>MathJax 支持行内公式</title>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+
+<h2>✅ 行内公式：</h2>
+<p>这里是 $E = mc^2$ 的行内展示</p>
+
+<h2>✅ 块公式：</h2>
+$$
+A_{\text{mid}} = A_{b_1:b_2}
+$$
+<article>
+  <br># 📘 CDIX计算算法说明<br><br>## 🔍 目的简介<br>CDIX（Complexity of Discrete Information indeX）是一种用于量化CMAP scan中肌电响应复杂性的指标。该指标通过对mid-scan段信号进行步长分析、概率建模和信息熵计算，从而衡量运动单位（MU）递招过程中的复杂程度。<br><br>## 📈 信号流程概述<br><br>1. 原始信号输入：CMAP扫描幅度序列 $ A = [A_1, A_2, ..., A_N] $<br>2. 平滑处理：使用3阶Butterworth低通滤波器获得平滑信号 $ E $<br>3. 分段提取：根据幅度阈值确定 mid-scan 区间 $ A_{b_1:b_2} $<br>4. 步长计算：计算相邻幅度的跳变幅度 $ S $<br>5. GMM分类：将步长划分为 small-step 与 large-step<br>6. 离散化：使用最小large-step幅度 $ G $ 作为单位，将幅度序列转为整数序列 $ D $<br>7. 熵计算：计算离散符号分布的信息熵 $ H $，并得出 CDIX<br><br>## 🧪 算法详细步骤<br><br>### 1. 平滑滤波<br>使用3阶 Butterworth 低通滤波器对原始 CMAP 扫描信号 $ A $ 进行平滑：<br><br>- 设计截止频率：<br>$F_c = \frac{50\pi}{N} \quad \text{(rad/sample)}$<br>- 处理方式：<br>$E = \text{filtfilt}(b, a, A)$<br>### 2. mid-scan 区间提取<br>根据下述阈值确定中段边界 $ b_1 $、$ b_2 $：<br><br>- 阈值计算：<br>$T_1 = E_{min} + (E_{max} - E_{min}) \cdot t_1 \\ T_2 = E_{min} + (E_{max} - E_{min}) \cdot t_2$<br>- 边界定义：<br>$b_1 = \max \{ n \mid E_n &lt; T_1 \} \\ b_2 = \min \{ n \mid E_n &gt; T_2 \}$<br>提取中段信号：<br>$A_{\text{mid}} = A_{b_1:b_2}$<br>### 3. 步长序列计算<br>对 mid-scan 信号计算跳变幅度（步长）：<br>$S = [|A_{b_1+1} - A_{b_1}|, \; |A_{b_1+2} - A_{b_1+1}|, \dots, |A_{b_2} - A_{b_2-1}|]$<br>### 4. GMM建模（两类混合高斯）<br><br>- 拟合 $ S $ 为两个分布（small-step 和 large-step）；<br>- 判定哪个分布为 small-step：选择均值更接近 0 的分布；<br>- 判定 large-step 属于哪个分布后，从中选取：<br>$G = \min(S_i \in \text{large-step})$<br>此 G 作为离散单位。<br><br>&gt; 💡 注：文献中提到使用 $ S \cup (-S) $ 来估计 small-step 分布的均值和方差，以强调其对称性，但实际 GMM 拟合仍基于原始 $ S $。<br><br>### 5. 离散化幅度序列<br><br>对 mid-scan 原始幅度按 G 进行离散化：<br>$D_i = \left\lfloor \frac{A_{b_1 + i}}{G} \right\rfloor, \quad \text{for } i = 0 \text{ to } b_2 - b_1$<br>得到离散符号序列 $ D = [D_1, D_2, ..., D_L] $，其中 $ L = b_2 - b_1 + 1 $。<br><br>### 6. 信息熵计算<br><br>对符号序列 D 中的每个唯一符号 $ i $，计算出现频数 $ F_i $：<br><br>- 令 $ p_i = \frac{F_i}{L} $<br>- 熵为：<br>$H = -\sum_i p_i \log_2 p_i$<br>### 7. CDIX 指数输出<br><br>最终 CDIX 为：<br>$\text{CDIX} = 2^H$<br>## 📌 公式汇总<br><br>| 名称     | 公式                                                         |<br>|----------|--------------------------------------------------------------|<br>| 步长序列 | $ S = \{ |A_{k+1} - A_k| \} $                               |<br>| G 值     | $ G = \min(S_{\text{large-step}}) $                        |<br>| 离散序列 | $ D = \left\lfloor \frac{A_{\text{mid}}}{G} \right\rfloor $ |<br>| 熵       | $ H = -\sum_i \frac{F_i}{L} \log_2\left(\frac{F_i}{L}\right) $ |<br>| CDIX     | $ \text{CDIX} = 2^H $                                       |<br><br>## 📎 附加说明<br><br>- CDIX 越大，表示招募过程越复杂；<br>- CDIX 与 MU 招募数量、顺序变动等生理特征具有相关性；<br>- GMM 分类为核心环节，参数设定与数据质量会影响最终结果。
+  <p>这个方法的最终目的：估计到底有多少个 motor units（MUs）被激活了，而且是有效的、可靠的、不被噪声影响的。</p>
+
+  <p>我的目的是只想知道：如果我们只要求达到 80% 的最终 CMAP 响应，理论上要招募多少个 MU？</p>
+  
+  <p>这个角度更符合生理意义：</p>
+  
+  <p>人在正常或病理状态下，很可能没有招募到全部 MU，但已经产生了大部分 CMAP 响应</p>
+  
+  <table>
+    <thead>
+      <tr>
+        <th>原因</th>
+        <th>说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>💡 生理上常见阈值</td>
+        <td>在 MUNE 和 CMAP 建模中，“80% 最大反应”常被用作临床可靠响应指标（非饱和区）</td>
+      </tr>
+      <tr>
+        <td>✅ 避免饱和</td>
+        <td>后 10–20% 的 CMAP 增量常常是高强度刺激导致的电流扩散、非 MU 放电引起的伪增益</td>
+      </tr>
+      <tr>
+        <td>✅ 稳定性好</td>
+        <td>低于 80% 易被 early noise 干扰，高于 80% 又会被刺激伪影干扰，80% 是折中点</td>
+      </tr>
+    </tbody>
+  </table>
+  
+  <p>首先我知道 step_amp 实际上就是 CMAP 的两两差值降序，我们可以把多个 MU 但包含在同一次差值里面激活的看成 1 个 MU，那么差值越大说明肯定是不同 MU 在放电了。</p>
+  
+  <p>如果 2 次记录之间的差值比较小，那就说明可能是噪声。</p>
+  
+  <p>现在认为 2 次记录差小于 20 μV 是噪声，Rₓ 点就是这个界限的 step，说明我们在这个假设下认为有 Rₓ 个不同 MU 放电。这个点是一个经验阈值，也就是说估计出来的 MU 最多就是 Rₓ 个。</p>
+  
+  <p>然后 Pₓ 点就是这块肌肉我们最大可能的 MU 个数了，因为差值太小就认为是噪声。step_amp，比如刺激 500 次，又不可能一直有 500 个 MU 被激活，所以通过拟合的方法大致知道差不多有多少个 MU 可以放电，差值为 0 就说明没有 MU 了，这时候就是 Pₓ。</p>
+  
+  <p>然后我们知道撑死大概就 Pₓ 个 MU 放电，那么计算这 Pₓ 个 MU 的 CMAP 累加值，认为这是有效的。然后得到平均每个 MU 的 CMAP 累加值，可以认为是 SMUP 均值。</p>
+  
+  <p>接下来，如果要得到 80% max CMAP 下要多少个 MU，那直接去找就好了，而且一开始的差值都很大，说明少量 MU 就能得到 80% CMAP 了。现在这个 Q 点是假设每个 MU 都按照平均 MUAP 来算，到 80% CMAP 要多少个 MU，这更多是一个假设值。</p>
+  
+  <p>如果 Qₓ > Rₓ，说明：</p>
+  <ul>
+    <li>要达到 80% CMAP 输出，理论上需要的 MU 比你实际观测到的要多；</li>
+    <li>要么是平均 MU 输出太弱（病理情况下常见）；</li>
+    <li>要么是你低估了真正的 MU 数量（R 点偏保守）；</li>
+    <li>更可能是两者兼有：肌肉状态变差 + 信号质量下降。</li>
+  </ul>
+  
+  <p>一旦 Qₓ > Rₓ，就意味着你已经进入了“不可置信区间”，继续用 Q 就可能落入噪声区了，宁可保守也不能错用噪声。</p>
+  
+  <p>如果 Qₓ &lt; Rₓ，说明：</p>
+  <p>80% CMAP 可以在可信区域内完成。</p>
+  
+</article>
+</body>
+</html>
